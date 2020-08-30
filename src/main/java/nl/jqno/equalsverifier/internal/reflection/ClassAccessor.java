@@ -1,19 +1,20 @@
 package nl.jqno.equalsverifier.internal.reflection;
 
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Modifier;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 import nl.jqno.equalsverifier.internal.exceptions.ReflectionException;
 import nl.jqno.equalsverifier.internal.prefabvalues.PrefabValues;
 import nl.jqno.equalsverifier.internal.prefabvalues.TypeTag;
 import nl.jqno.equalsverifier.internal.reflection.annotations.AnnotationCache;
 import nl.jqno.equalsverifier.internal.reflection.annotations.NonnullAnnotationVerifier;
-
-import java.lang.reflect.Constructor;
-import java.lang.reflect.Field;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Modifier;
-import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
-import java.util.stream.StreamSupport;
 
 /**
  * Instantiates and populates objects of a given class. {@link ClassAccessor} can create two
@@ -176,6 +177,9 @@ public class ClassAccessor<T> {
      * @return An {@link ObjectAccessor} for {@link #getRedObject(TypeTag)}.
      */
     public ObjectAccessor<T> getRedAccessor(TypeTag enclosingType) {
+        if (isRecord()) {
+            return getRecordObjectAccessor(enclosingType, prefabValues::giveRed);
+        }
         ObjectAccessor<T> result = buildObjectAccessor();
         result.scramble(prefabValues, enclosingType);
         return result;
@@ -201,6 +205,9 @@ public class ClassAccessor<T> {
      * @return An {@link ObjectAccessor} for {@link #getBlueObject(TypeTag)}.
      */
     public ObjectAccessor<T> getBlueAccessor(TypeTag enclosingType) {
+        if (isRecord()) {
+            return getRecordObjectAccessor(enclosingType, prefabValues::giveBlue);
+        }
         ObjectAccessor<T> result = buildObjectAccessor();
         result.scramble(prefabValues, enclosingType);
         result.scramble(prefabValues, enclosingType);
@@ -221,15 +228,43 @@ public class ClassAccessor<T> {
      */
     public ObjectAccessor<T> getDefaultValuesAccessor(
             TypeTag enclosingType, Set<String> nonnullFields, AnnotationCache annotationCache) {
+        if (isRecord()) {
+            List<?> values = new ArrayList<>();
+            for (Field field : FieldIterable.of(type)) {
+                if (shouldHaveNonDefaultValue(field, nonnullFields, annotationCache)) {
+                    values.add(prefabValues.giveRed(TypeTag.of(field, enclosingType)));
+                } else {
+                    values.add(prefabValues.giveDefault(TypeTag.of(field, enclosingType)));
+                }
+            }
+            return ObjectAccessor.of(callRecordConstructor(getRecordConstructor(), values));
+        }
+
         ObjectAccessor<T> result = buildObjectAccessor();
         for (Field field : FieldIterable.of(type)) {
-            if (NonnullAnnotationVerifier.fieldIsNonnull(field, annotationCache)
-                    || nonnullFields.contains(field.getName())) {
+            if (shouldHaveNonDefaultValue(field, nonnullFields, annotationCache)) {
                 FieldAccessor accessor = result.fieldAccessorFor(field);
                 accessor.changeField(prefabValues, enclosingType);
             }
         }
         return result;
+    }
+
+    private boolean shouldHaveNonDefaultValue(
+            Field field, Set<String> nonnullFields, AnnotationCache annotationCache) {
+        return NonnullAnnotationVerifier.fieldIsNonnull(field, annotationCache)
+                || nonnullFields.contains(field.getName());
+    }
+
+    private ObjectAccessor<T> getRecordObjectAccessor(
+            TypeTag enclosingType, Function<TypeTag, ?> color) {
+        List<?> params =
+                StreamSupport.stream(FieldIterable.of(type).spliterator(), false)
+                        .map(f -> TypeTag.of(f, enclosingType))
+                        .map(color)
+                        .collect(Collectors.toList());
+        T obj = callRecordConstructor(getRecordConstructor(), params);
+        return ObjectAccessor.of(obj);
     }
 
     public Constructor<T> getRecordConstructor() {
@@ -250,10 +285,9 @@ public class ClassAccessor<T> {
     public T callRecordConstructor(Constructor<T> constructor, List<?> params) {
         try {
             return constructor.newInstance(params.toArray(new Object[0]));
-        } catch (InstantiationException
-                | IllegalAccessException
-                | IllegalArgumentException
-                | InvocationTargetException e) {
+        } catch (InvocationTargetException e) {
+            throw new ReflectionException("Record: failed to invoke constructor.", e);
+        } catch (InstantiationException | IllegalAccessException | IllegalArgumentException e) {
             return null;
         }
     }
