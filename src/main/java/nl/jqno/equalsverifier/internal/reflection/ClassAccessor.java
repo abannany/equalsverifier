@@ -1,13 +1,19 @@
 package nl.jqno.equalsverifier.internal.reflection;
 
-import java.lang.reflect.Field;
-import java.lang.reflect.Modifier;
-import java.util.Set;
 import nl.jqno.equalsverifier.internal.exceptions.ReflectionException;
 import nl.jqno.equalsverifier.internal.prefabvalues.PrefabValues;
 import nl.jqno.equalsverifier.internal.prefabvalues.TypeTag;
 import nl.jqno.equalsverifier.internal.reflection.annotations.AnnotationCache;
 import nl.jqno.equalsverifier.internal.reflection.annotations.NonnullAnnotationVerifier;
+
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Modifier;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 /**
  * Instantiates and populates objects of a given class. {@link ClassAccessor} can create two
@@ -224,6 +230,32 @@ public class ClassAccessor<T> {
             }
         }
         return result;
+    }
+
+    public Constructor<T> getRecordConstructor() {
+        try {
+            List<Class<?>> constructorTypes =
+                    StreamSupport.stream(FieldIterable.of(type).spliterator(), false)
+                            .map(Field::getType)
+                            .collect(Collectors.toList());
+            Constructor<T> constructor =
+                    type.getConstructor(constructorTypes.toArray(new Class<?>[0]));
+            constructor.setAccessible(true);
+            return constructor;
+        } catch (NoSuchMethodException | SecurityException e) {
+            return null;
+        }
+    }
+
+    public T callRecordConstructor(Constructor<T> constructor, List<?> params) {
+        try {
+            return constructor.newInstance(params.toArray(new Object[0]));
+        } catch (InstantiationException
+                | IllegalAccessException
+                | IllegalArgumentException
+                | InvocationTargetException e) {
+            return null;
+        }
     }
 
     private ObjectAccessor<T> buildObjectAccessor() {
