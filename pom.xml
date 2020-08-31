@@ -57,7 +57,6 @@
     <properties>
         <encoding>UTF-8</encoding>
         <java.release>8</java.release>
-        <jacoco.version>0.8.5</jacoco.version>
 
         <checkstyle.version>8.35</checkstyle.version> <!-- Property for Checkstyle's regression CI - see issue 216 -->
         <checkstyle.maven.version>3.1.1</checkstyle.maven.version>
@@ -356,21 +355,6 @@
                         </configuration>
                     </plugin>
 
-                    <plugin>
-                        <groupId>org.jacoco</groupId>
-                        <artifactId>jacoco-maven-plugin</artifactId>
-                        <executions>
-                            <execution>
-                                <id>default-prepare-agent</id>
-                                <goals>
-                                    <goal>prepare-agent</goal>
-                                </goals>
-                                <configuration>
-                                    <propertyName>surefire.argLine</propertyName>
-                                </configuration>
-                            </execution>
-                        </executions>
-                    </plugin>
                 </plugins>
             </build>
         </profile>
@@ -385,84 +369,7 @@
             
             <build>
                 <plugins>
-                    <plugin>
-                        <groupId>org.jacoco</groupId>
-                        <artifactId>jacoco-maven-plugin</artifactId>
-                        <version>${jacoco.version}</version>
-                        <executions>
-                            <execution>
-                                <id>default-prepare-agent</id>
-                                <goals>
-                                    <goal>prepare-agent</goal>
-                                </goals>
-                            </execution>
-                        </executions>
-                    </plugin>
 
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-antrun-plugin</artifactId>
-                        <version>3.0.0</version>
-                        <dependencies>
-                            <dependency>
-                                <groupId>org.jacoco</groupId>
-                                <artifactId>org.jacoco.ant</artifactId>
-                                <version>${jacoco.version}</version>
-                            </dependency>
-                        </dependencies>
-                        <executions>
-                            <execution>
-                                <id>run-jacoco</id>
-                                <phase>verify</phase>
-                                <goals>
-                                    <goal>run</goal>
-                                </goals>
-                                <configuration>
-                                    <target>
-                                        <taskdef name="report" classname="org.jacoco.ant.ReportTask" classpathref="maven.plugin.classpath" />
-                                        <report>
-                                            <executiondata>
-                                                <file file="${project.build.directory}/jacoco.exec" />
-                                            </executiondata>
-                                            <structure name="EqualsVerifier: external coverage">
-                                                <classfiles>
-                                                    <fileset dir="${project.build.testOutputDirectory}/nl/jqno/equalsverifier/coverage" />
-                                                </classfiles>
-                                                <sourcefiles encoding="UTF-8">
-                                                    <fileset dir="${project.build.testSourceDirectory}" />
-                                                </sourcefiles>
-                                            </structure>
-                                            <check failonviolation="true" violationsproperty="violation">
-                                                <rule element="BUNDLE">
-                                                    <limit counter="INSTRUCTION" value="COVEREDRATIO" minimum="1.00" />
-                                                </rule>
-                                            </check>
-                                            <html destdir="${project.build.directory}/jacoco-external" />
-                                        </report>
-                                        <report>
-                                            <executiondata>
-                                                <file file="${project.build.directory}/jacoco.exec" />
-                                            </executiondata>
-                                            <structure name="EqualsVerifier: internal coverage">
-                                                <classfiles>
-                                                    <fileset dir="${project.build.outputDirectory}" />
-                                                </classfiles>
-                                                <sourcefiles encoding="UTF-8">
-                                                    <fileset dir="${project.build.sourceDirectory}" />
-                                                </sourcefiles>
-                                            </structure>
-                                            <check failonviolation="true" violationsproperty="violation">
-                                                <rule element="BUNDLE">
-                                                    <limit counter="INSTRUCTION" value="COVEREDRATIO" minimum="0.95" />
-                                                </rule>
-                                            </check>
-                                            <html destdir="${project.build.directory}/jacoco-internal" />
-                                        </report>
-                                    </target>
-                                </configuration>
-                            </execution>
-                        </executions>
-                    </plugin>
 
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
@@ -542,12 +449,6 @@
 
             <reporting>
                 <plugins>
-                    <plugin>
-                        <groupId>org.jacoco</groupId>
-                        <artifactId>jacoco-maven-plugin</artifactId>
-                        <version>${jacoco.version}</version>
-                    </plugin>
-
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-checkstyle-plugin</artifactId>
